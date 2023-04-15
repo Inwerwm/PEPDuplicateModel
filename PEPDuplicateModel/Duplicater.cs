@@ -2,8 +2,10 @@
 using PEPlugin;
 using PEPlugin.Pmx;
 using PEPlugin.SDX;
+using SlimDX;
 using System;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace PEPDuplicateModel
 {
@@ -34,7 +36,7 @@ namespace PEPDuplicateModel
             rootsNode.Name = pmx.RootNode.Items.FirstOrDefault()?.BoneItem?.Bone?.Name ?? "すべての親";
             rootsNode.NameE = pmx.RootNode.Items.FirstOrDefault()?.BoneItem?.Bone?.NameE ?? "Sub Root";
 
-            foreach (var duplicant in Enumerable.Range(1, count - 1).Select(i => CreateDuplicant(pmx, i)))
+            foreach (var duplicant in Enumerable.Range(1, count - 1).Select(i => CreateDuplicant(pmx, i, setLocalAxisToArmBones)))
             {
                 rootsNode.Items.Add(duplicant.RootNode.Items.FirstOrDefault());
             }
@@ -67,9 +69,38 @@ namespace PEPDuplicateModel
             return pmx;
         }
 
-        private static IPXPmx CreateDuplicant(IPXPmx pmx, int duplicationIndex)
+        private static IPXPmx CreateDuplicant(IPXPmx pmx, int duplicationIndex, bool setLocalAxisToArmBones)
         {
             var duplicant = (IPXPmx)pmx.Clone();
+
+            if (setLocalAxisToArmBones)
+            {
+                string[] armBoneNames = new[]
+                {
+                    "腕",
+                    "ひじ",
+                    "手首",
+                };
+
+                foreach (var prefix in new[] { "右", "左" })
+                {
+                    var armBones = FindArmBones(duplicant, prefix, armBoneNames);
+
+                    V3 armDirection = CalcDirection(armBones.Arm, armBones.Elbow);
+                    V3 elbowDirection = CalcDirection(armBones.Elbow, armBones.Wrist);
+                    V3 wristDirection = armBones.Wrist.ToBone is null ? armBones.Wrist.ToOffset : CalcDirection(armBones.Wrist, armBones.Wrist.ToBone);
+
+                    var targetBones = armBoneNames
+                        .Zip(new[] { armDirection, elbowDirection, wristDirection }, (name, dir) => (Name: name, Direction: dir))
+                        .SelectMany(bone =>
+                            duplicant.Bone.Where(b => Regex.IsMatch(b.Name, bone.Name + @"親?[0-9０-９]*$")).Select(b => (Bone: b, bone.Direction))
+                        );
+                    foreach (var (bone, direction) in targetBones)
+                    {
+                        SetLocalAxis(bone, direction);
+                    }
+                }
+            }
 
             var numSuffix = $" |{duplicationIndex}";
             var offset = MakeOffset(duplicationIndex);
@@ -132,6 +163,38 @@ namespace PEPDuplicateModel
 
             return duplicant;
         }
+
+        private static (IPXBone Arm, IPXBone Elbow, IPXBone Wrist) FindArmBones(IPXPmx pmx, string prefix, string[] armBoneNames)
+        {
+            var bones = armBoneNames.Select(name => prefix + name).Select(name => pmx.Bone.FirstOrDefault(bone => bone.Name == name)).ToArray();
+
+            return (bones[0], bones[1], bones[2]);
+        }
+
+        private static void SetLocalAxis(IPXBone bone, Vector3 direction)
+        {
+            if (direction == Vector3.Zero) { return; }
+
+            direction.Normalize();
+
+            if (direction == Vector3.UnitZ)
+            {
+                bone.SetLocalAxis(Vector3.UnitZ, -Vector3.UnitX);
+            }
+            else if (direction == -Vector3.UnitZ)
+            {
+                bone.SetLocalAxis(-Vector3.UnitZ, Vector3.UnitX);
+            }
+            else
+            {
+                Matrix matrix = Matrix.RotationQuaternion(Q.Dir(direction, Vector3.UnitZ, Vector3.UnitX, Vector3.UnitZ));
+                bone.SetLocalAxis(Vector3.TransformNormal(Vector3.UnitX, matrix), Vector3.TransformNormal(Vector3.UnitZ, matrix));
+            }
+
+            bone.IsLocalFrame = true;
+        }
+
+        private static V3 CalcDirection(IPXBone source, IPXBone destination) => destination.Position - source.Position;
 
         private static V3 MakeOffset(int index)
         {
