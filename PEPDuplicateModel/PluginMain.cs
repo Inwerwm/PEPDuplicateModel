@@ -26,7 +26,7 @@ namespace PEPDuplicateModel
         {
             try
             {
-                Form = Form ?? new FormControl(args);
+                Form = Form ?? new FormControl(new Duplicater(args));
                 Form.Reload();
                 Form.Show();
             }

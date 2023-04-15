@@ -1,4 +1,5 @@
-﻿using PEPlugin;
+﻿using PEPExtensions;
+using PEPlugin;
 using PEPlugin.Pmx;
 using PEPlugin.SDX;
 using System;
@@ -6,11 +7,23 @@ using System.Linq;
 
 namespace PEPDuplicateModel
 {
-    internal class Duplicater
+    public class Duplicater
     {
-        public static IPXPmx Duplicate(IPXPmx source, int count)
+        private IPERunArgs Args { get; }
+
+        public Duplicater(IPERunArgs args)
         {
-            var pmx = (IPXPmx)source.Clone();
+            Args = args;
+        }
+
+        public void Update(IPXPmx model)
+        {
+            Utility.Update(Args.Host.Connector, model);
+        }
+
+        public IPXPmx Duplicate(int count)
+        {
+            var pmx = Args.Host.Connector.Pmx.GetCurrentState();
 
             if (count < 2)
             {
@@ -26,7 +39,7 @@ namespace PEPDuplicateModel
                 var numSuffix = $" |{duplicateNum}";
                 var offset = MakeOffset(duplicateNum);
 
-                var duplication = (IPXPmx)source.Clone();
+                var duplication = (IPXPmx)pmx.Clone();
 
                 foreach (var item in duplication.Body)
                 {

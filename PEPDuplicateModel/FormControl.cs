@@ -15,11 +15,11 @@ namespace PEPDuplicateModel
 {
     public partial class FormControl : Form
     {
-        IPERunArgs Args { get; }
+        Duplicater Duplicater { get; }
 
-        public FormControl(IPERunArgs args)
+        public FormControl(Duplicater duplicater)
         {
-            Args = args;
+            Duplicater = duplicater;
 
             InitializeComponent();
             Reload();
@@ -38,8 +38,8 @@ namespace PEPDuplicateModel
 
         private void button1_Click(object sender, EventArgs e)
         {
-            var duplicated = Duplicater.Duplicate(Args.Host.Connector.Pmx.GetCurrentState(), (int)numericUpDown1.Value);
-            Utility.Update(Args.Host.Connector, duplicated);
+            var duplicated = Duplicater.Duplicate((int)numericUpDown1.Value);
+            Duplicater.Update(duplicated);
         }
     }
 }
