@@ -26,6 +26,7 @@ namespace PEPDuplicateModel
         public IPXPmx Duplicate(int count, bool addAllParent, bool setLocalAxisToArmBones)
         {
             var pmx = Args.Host.Connector.Pmx.GetCurrentState();
+            var prototype = (IPXPmx)pmx.Clone();
 
             if (count < 2)
             {
@@ -36,7 +37,7 @@ namespace PEPDuplicateModel
             rootsNode.Name = pmx.RootNode.Items.FirstOrDefault()?.BoneItem?.Bone?.Name ?? "すべての親";
             rootsNode.NameE = pmx.RootNode.Items.FirstOrDefault()?.BoneItem?.Bone?.NameE ?? "Sub Root";
 
-            foreach (var duplicant in Enumerable.Range(1, count - 1).Select(i => CreateDuplicant(pmx, i, setLocalAxisToArmBones)))
+            foreach (var duplicant in Enumerable.Range(1, count - 1).Select(i => CreateDuplicant(pmx, prototype, i, setLocalAxisToArmBones)))
             {
                 rootsNode.Items.Add(duplicant.RootNode.Items.FirstOrDefault());
             }
@@ -46,7 +47,7 @@ namespace PEPDuplicateModel
             if (addAllParent)
             {
                 // 元の全親を新しい表情枠に追加
-                rootsNode.Items.Add(pmx.RootNode.Items.FirstOrDefault());
+                rootsNode.Items.Insert(0, pmx.RootNode.Items.FirstOrDefault());
 
                 // 全体親を追加
                 var superRoot = Args.Host.Builder.Pmx.Bone();
@@ -69,9 +70,9 @@ namespace PEPDuplicateModel
             return pmx;
         }
 
-        private static IPXPmx CreateDuplicant(IPXPmx pmx, int duplicationIndex, bool setLocalAxisToArmBones)
+        private static IPXPmx CreateDuplicant(IPXPmx pmx, IPXPmx prototype, int duplicationIndex, bool setLocalAxisToArmBones)
         {
-            var duplicant = (IPXPmx)pmx.Clone();
+            var duplicant = (IPXPmx)prototype.Clone();
 
             if (setLocalAxisToArmBones)
             {
@@ -91,7 +92,7 @@ namespace PEPDuplicateModel
                     V3 wristDirection = armBones.Wrist.ToBone is null ? armBones.Wrist.ToOffset : CalcDirection(armBones.Wrist, armBones.Wrist.ToBone);
 
                     var targetBones = armBoneNames
-                        .Zip(new[] { armDirection, elbowDirection, wristDirection }, (name, dir) => (Name: name, Direction: dir))
+                        .Zip(new[] { armDirection, elbowDirection, wristDirection }, (name, dir) => (Name: prefix + name, Direction: dir))
                         .SelectMany(bone =>
                             duplicant.Bone.Where(b => Regex.IsMatch(b.Name, bone.Name + @"親?[0-9０-９]*$")).Select(b => (Bone: b, bone.Direction))
                         );
@@ -150,9 +151,16 @@ namespace PEPDuplicateModel
 
             foreach (var (item, nodeId) in duplicant.Node.Select((node, id) => (node, id)))
             {
+                var originalNodeIndex = pmx.Node.IndexOf(pmx.Node.First(node => node.Name == item.Name));
+                int insertIndex = originalNodeIndex + duplicationIndex;
+
                 item.Name += numSuffix;
                 item.NameE += numSuffix;
-                pmx.Node.Insert(nodeId * duplicationIndex + nodeId + duplicationIndex, item);
+
+                if (insertIndex < pmx.Node.Count)
+                    pmx.Node.Insert(insertIndex, item);
+                else
+                    pmx.Node.Add(item);
             }
 
             foreach (var item in duplicant.Vertex)
