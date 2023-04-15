@@ -26,8 +26,6 @@ namespace PEPDuplicateModel
         public IPXPmx Duplicate(int count, bool addAllParent, bool setLocalAxisToArmBones)
         {
             var pmx = Args.Host.Connector.Pmx.GetCurrentState();
-            var prototype = (IPXPmx)pmx.Clone();
-
             if (count < 2)
             {
                 return pmx;
@@ -37,9 +35,29 @@ namespace PEPDuplicateModel
             rootsNode.Name = pmx.RootNode.Items.FirstOrDefault()?.BoneItem?.Bone?.Name ?? "すべての親";
             rootsNode.NameE = pmx.RootNode.Items.FirstOrDefault()?.BoneItem?.Bone?.NameE ?? "Sub Root";
 
-            foreach (var duplicant in Enumerable.Range(1, count - 1).Select(i => CreateDuplicant(pmx, prototype, i, setLocalAxisToArmBones)))
+            var duplicants = Enumerable.Range(1, count - 1).Select(i => CreateDuplicant(pmx, i, setLocalAxisToArmBones)).ToArray();
+            foreach (var (duplicant, duplicationIndex) in duplicants.Select((d, i) => (d, i)))
             {
                 rootsNode.Items.Add(duplicant.RootNode.Items.FirstOrDefault());
+
+                pmx.Body.AddRange(duplicant.Body);
+                pmx.Bone.AddRange(duplicant.Bone);
+                pmx.ExpressionNode.Items.AddRange(duplicant.ExpressionNode.Items);
+                pmx.Joint.AddRange(duplicant.Joint);
+                pmx.Material.AddRange(duplicant.Material);
+                pmx.Morph.AddRange(duplicant.Morph);
+                pmx.Vertex.AddRange(duplicant.Vertex);
+
+                foreach (var (item, nodeId) in duplicant.Node.Select((node, id) => (node, id)))
+                {
+                    var originalNodeIndex = pmx.Node.IndexOf(pmx.Node.First(node => (node.Name + GetNumSuffix(duplicationIndex)) == item.Name));
+                    int insertIndex = originalNodeIndex + duplicationIndex;
+
+                    if (insertIndex < pmx.Node.Count)
+                        pmx.Node.Insert(insertIndex, item);
+                    else
+                        pmx.Node.Add(item);
+                }
             }
 
             pmx.Node.Insert(0, rootsNode);
@@ -70,9 +88,9 @@ namespace PEPDuplicateModel
             return pmx;
         }
 
-        private static IPXPmx CreateDuplicant(IPXPmx pmx, IPXPmx prototype, int duplicationIndex, bool setLocalAxisToArmBones)
+        private static IPXPmx CreateDuplicant(IPXPmx pmx, int duplicationIndex, bool setLocalAxisToArmBones)
         {
-            var duplicant = (IPXPmx)prototype.Clone();
+            var duplicant = (IPXPmx)pmx.Clone();
 
             if (setLocalAxisToArmBones)
             {
@@ -103,7 +121,7 @@ namespace PEPDuplicateModel
                 }
             }
 
-            var numSuffix = $" |{duplicationIndex}";
+            var numSuffix = GetNumSuffix(duplicationIndex);
             var offset = MakeOffset(duplicationIndex);
 
             foreach (var item in duplicant.Body)
@@ -111,7 +129,6 @@ namespace PEPDuplicateModel
                 item.Name += numSuffix;
                 item.NameE += numSuffix;
                 item.Position += offset;
-                pmx.Body.Add(item);
             }
 
             foreach (var item in duplicant.Bone)
@@ -119,12 +136,6 @@ namespace PEPDuplicateModel
                 item.Name += numSuffix;
                 item.NameE += numSuffix;
                 item.Position += offset;
-                pmx.Bone.Add(item);
-            }
-
-            foreach (var item in duplicant.ExpressionNode.Items)
-            {
-                pmx.ExpressionNode.Items.Add(item);
             }
 
             foreach (var item in duplicant.Joint)
@@ -132,44 +143,37 @@ namespace PEPDuplicateModel
                 item.Name += numSuffix;
                 item.NameE += numSuffix;
                 item.Position += offset;
-                pmx.Joint.Add(item);
             }
 
             foreach (var item in duplicant.Material)
             {
                 item.Name += numSuffix;
                 item.NameE += numSuffix;
-                pmx.Material.Add(item);
             }
 
             foreach (var item in duplicant.Morph)
             {
                 item.Name += numSuffix;
                 item.NameE += numSuffix;
-                pmx.Morph.Add(item);
             }
 
             foreach (var (item, nodeId) in duplicant.Node.Select((node, id) => (node, id)))
             {
-                var originalNodeIndex = pmx.Node.IndexOf(pmx.Node.First(node => node.Name == item.Name));
-                int insertIndex = originalNodeIndex + duplicationIndex;
-
                 item.Name += numSuffix;
                 item.NameE += numSuffix;
-
-                if (insertIndex < pmx.Node.Count)
-                    pmx.Node.Insert(insertIndex, item);
-                else
-                    pmx.Node.Add(item);
             }
 
             foreach (var item in duplicant.Vertex)
             {
                 item.Position += offset;
-                pmx.Vertex.Add(item);
             }
 
             return duplicant;
+        }
+
+        private static string GetNumSuffix(int duplicationIndex)
+        {
+            return $" |{duplicationIndex}";
         }
 
         private static (IPXBone Arm, IPXBone Elbow, IPXBone Wrist) FindArmBones(IPXPmx pmx, string prefix, string[] armBoneNames)
