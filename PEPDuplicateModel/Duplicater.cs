@@ -41,6 +41,29 @@ namespace PEPDuplicateModel
 
             pmx.Node.Insert(0, rootsNode);
 
+            if (addAllParent)
+            {
+                // 元の全親を新しい表情枠に追加
+                rootsNode.Items.Add(pmx.RootNode.Items.FirstOrDefault());
+
+                // 全体親を追加
+                var superRoot = Args.Host.Builder.Pmx.Bone();
+                superRoot.Name = "全体親";
+                superRoot.NameE = "Super Root";
+                superRoot.IsRotation = true;
+                superRoot.IsTranslation = true;
+
+                // 既存の親なしボーンに全体親を親設定
+                foreach (var bone in pmx.Bone.Where(bone => bone.Parent is null))
+                {
+                    bone.Parent = superRoot;
+                }
+
+                // root 表示枠に全体親を設定
+                pmx.Bone.Insert(0, superRoot);
+                pmx.RootNode.Items[0] = Args.Host.Builder.Pmx.BoneNodeItem(superRoot);
+            }
+
             return pmx;
         }
 
