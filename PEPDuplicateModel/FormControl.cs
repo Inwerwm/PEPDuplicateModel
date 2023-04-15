@@ -38,7 +38,7 @@ namespace PEPDuplicateModel
 
         private void button1_Click(object sender, EventArgs e)
         {
-            var duplicated = Duplicater.Duplicate((int)numericUpDown1.Value);
+            var duplicated = Duplicater.Duplicate((int)numericUpDown1.Value, checkBoxAddAllParent.Checked, checkBoxSetLocalAxis.Checked);
             Duplicater.Update(duplicated);
         }
     }

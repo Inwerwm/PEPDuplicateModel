@@ -21,7 +21,7 @@ namespace PEPDuplicateModel
             Utility.Update(Args.Host.Connector, model);
         }
 
-        public IPXPmx Duplicate(int count)
+        public IPXPmx Duplicate(int count, bool addAllParent, bool setLocalAxisToArmBones)
         {
             var pmx = Args.Host.Connector.Pmx.GetCurrentState();
 
