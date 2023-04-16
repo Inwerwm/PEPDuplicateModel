@@ -36,7 +36,7 @@ namespace PEPDuplicateModel
             rootsNode.NameE = pmx.RootNode.Items.FirstOrDefault()?.BoneItem?.Bone?.NameE ?? "Sub Root";
 
             var duplicants = Enumerable.Range(1, count - 1).Select(i => CreateDuplicant(pmx, i, setLocalAxisToArmBones)).ToArray();
-            foreach (var (duplicant, duplicationIndex) in duplicants.Select((d, i) => (d, i)))
+            foreach (var (duplicant, duplicationIndex) in duplicants.Select((d, i) => (d, i + 1)))
             {
                 rootsNode.Items.Add(duplicant.RootNode.Items.FirstOrDefault());
 
